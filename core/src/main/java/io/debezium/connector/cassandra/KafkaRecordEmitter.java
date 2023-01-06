@@ -12,7 +12,7 @@ import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
-import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.connect.storage.Converter;
@@ -29,7 +29,7 @@ import io.debezium.spi.topic.TopicNamingStrategy;
 public class KafkaRecordEmitter implements Emitter {
     private static final Logger LOGGER = LoggerFactory.getLogger(KafkaRecordEmitter.class);
 
-    private final KafkaProducer<byte[], byte[]> producer;
+    private final Producer<byte[], byte[]> producer;
     private final TopicNamingStrategy<KeyspaceTable> topicNamingStrategy;
     private final OffsetWriter offsetWriter;
     private final OffsetFlushPolicy offsetFlushPolicy;
@@ -42,7 +42,7 @@ public class KafkaRecordEmitter implements Emitter {
     private long timeOfLastFlush;
     private long emitCount = 0;
 
-    public KafkaRecordEmitter(CassandraConnectorConfig connectorConfig, KafkaProducer kafkaProducer,
+    public KafkaRecordEmitter(CassandraConnectorConfig connectorConfig, Producer kafkaProducer,
                               OffsetWriter offsetWriter, Duration offsetFlushIntervalMs, long maxOffsetFlushSize,
                               Converter keyConverter, Converter valueConverter, Set<String> erroneousCommitLogs,
                               CommitLogTransfer commitLogTransfer) {
