@@ -61,6 +61,7 @@ public class KafkaRecordEmitter implements Emitter {
         try {
             synchronized (lock) {
                 ProducerRecord<byte[], byte[]> producerRecord = toProducerRecord(record);
+                LOGGER.error("Sending record {} to topic {}", record, producerRecord.topic());
                 Future<RecordMetadata> future = producer.send(producerRecord);
                 LOGGER.trace("Sent to topic {}: {}", producerRecord.topic(), record);
                 futures.put(record, future);
