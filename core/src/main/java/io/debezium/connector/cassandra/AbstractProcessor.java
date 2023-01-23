@@ -52,12 +52,13 @@ public abstract class AbstractProcessor {
     }
 
     public void start() throws Exception {
+        LOGGER.error("Started processor " + this.getName());
         if (running) {
             LOGGER.warn("Ignoring start signal for {} because it is already started", name);
             return;
         }
 
-        LOGGER.info("Started {}", name);
+        LOGGER.info("#### Started {}", name);
         running = true;
         while (isRunning()) {
             process();

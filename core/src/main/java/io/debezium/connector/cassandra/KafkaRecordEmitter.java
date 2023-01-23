@@ -19,6 +19,12 @@ import org.apache.kafka.connect.storage.Converter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.cloud.pubsublite.CloudRegion;
+import com.google.cloud.pubsublite.CloudZone;
+import com.google.cloud.pubsublite.ProjectId;
+import com.google.cloud.pubsublite.TopicName;
+import com.google.cloud.pubsublite.TopicPath;
+
 import io.debezium.DebeziumException;
 import io.debezium.config.CommonConnectorConfig;
 import io.debezium.spi.topic.TopicNamingStrategy;
@@ -27,6 +33,7 @@ import io.debezium.spi.topic.TopicNamingStrategy;
  * This emitter is responsible for emitting records to Kafka broker and managing offsets post send.
  */
 public class KafkaRecordEmitter implements Emitter {
+
     private static final Logger LOGGER = LoggerFactory.getLogger(KafkaRecordEmitter.class);
 
     private final Producer<byte[], byte[]> producer;
@@ -42,34 +49,63 @@ public class KafkaRecordEmitter implements Emitter {
     private long timeOfLastFlush;
     private long emitCount = 0;
 
+    private String topicPath;
+
     public KafkaRecordEmitter(CassandraConnectorConfig connectorConfig, Producer kafkaProducer,
                               OffsetWriter offsetWriter, Duration offsetFlushIntervalMs, long maxOffsetFlushSize,
                               Converter keyConverter, Converter valueConverter, Set<String> erroneousCommitLogs,
                               CommitLogTransfer commitLogTransfer) {
+        LOGGER.error("In Kafka Emittor constructor...");
         this.producer = kafkaProducer;
-        this.topicNamingStrategy = connectorConfig.getTopicNamingStrategy(CommonConnectorConfig.TOPIC_NAMING_STRATEGY);
+        this.topicNamingStrategy = connectorConfig.getTopicNamingStrategy(
+                CommonConnectorConfig.TOPIC_NAMING_STRATEGY);
         this.offsetWriter = offsetWriter;
-        this.offsetFlushPolicy = offsetFlushIntervalMs.isZero() ? OffsetFlushPolicy.always() : OffsetFlushPolicy.periodic(offsetFlushIntervalMs, maxOffsetFlushSize);
+        this.offsetFlushPolicy = offsetFlushIntervalMs.isZero() ? OffsetFlushPolicy.always()
+                : OffsetFlushPolicy.periodic(offsetFlushIntervalMs, maxOffsetFlushSize);
         this.erroneousCommitLogs = erroneousCommitLogs;
         this.commitLogTransfer = commitLogTransfer;
         this.keyConverter = keyConverter;
         this.valueConverter = valueConverter;
+        this.topicPath = TopicPath.newBuilder()
+                .setLocation(CloudZone.of(CloudRegion.of("us-east1"), 'b'))
+                .setProject(ProjectId.of("google.com:cloud-bigtable-dev"))
+                .setName(TopicName.of("test-shitanshu"))
+                .build().toString();
+
+        LOGGER.error("##### Created emitter, starting pubsub lite emitter.");
+        System.out.println("###### Created emitter, starting pubsub lite emitter.");
+
+        try {
+            ProducerRecord<byte[], byte[]> producerRecord = new ProducerRecord<>(this.topicPath,
+                    "test-key-constructor".getBytes(), "test-val-constrcutor".getBytes());
+            Future<RecordMetadata> future = producer.send(producerRecord);
+            future.get();
+        }
+        catch (Exception e) {
+            LOGGER.error("######### Failed to send a message from the constructor...", e);
+            return;
+            // throw new RuntimeException(e);
+        }
+        LOGGER.error("#########sent a message from the constructor..");
+        System.out.println("######## sent a message from the constructor..");
     }
 
     @Override
     public void emit(Record record) {
+        LOGGER.error("##### In the emit method on KafkaEmitter.");
         try {
             synchronized (lock) {
                 ProducerRecord<byte[], byte[]> producerRecord = toProducerRecord(record);
-                LOGGER.error("Sending record {} to topic {}", record, producerRecord.topic());
+                LOGGER.error("##### Sending record {} to topic {}", record.toString(), producerRecord.topic().toString());
                 Future<RecordMetadata> future = producer.send(producerRecord);
-                LOGGER.trace("Sent to topic {}: {}", producerRecord.topic(), record);
+                LOGGER.error("##### Sent to topic {}: {}", producerRecord.topic(), record.toString());
                 futures.put(record, future);
                 maybeFlushAndMarkOffset();
             }
         }
         catch (Exception e) {
-            if (record.getSource().snapshot || commitLogTransfer.getClass().getName().equals(CassandraConnectorConfig.DEFAULT_COMMIT_LOG_TRANSFER_CLASS)) {
+            if (record.getSource().snapshot || commitLogTransfer.getClass().getName()
+                    .equals(CassandraConnectorConfig.DEFAULT_COMMIT_LOG_TRANSFER_CLASS)) {
                 throw new DebeziumException(String.format("Failed to send record %s", record), e);
             }
             LOGGER.error("Failed to send the record {}. Error: ", record, e);
@@ -78,10 +114,11 @@ public class KafkaRecordEmitter implements Emitter {
     }
 
     protected ProducerRecord<byte[], byte[]> toProducerRecord(Record record) {
-        String topic = topicNamingStrategy.dataChangeTopic(record.getSource().keyspaceTable);
-        byte[] serializedKey = keyConverter.fromConnectData(topic, record.getKeySchema(), record.buildKey());
-        byte[] serializedValue = valueConverter.fromConnectData(topic, record.getValueSchema(), record.buildValue());
-        return new ProducerRecord<>(topic, serializedKey, serializedValue);
+        byte[] serializedKey = keyConverter.fromConnectData(this.topicPath, record.getKeySchema(),
+                record.buildKey());
+        byte[] serializedValue = valueConverter.fromConnectData(this.topicPath, record.getValueSchema(),
+                record.buildValue());
+        return new ProducerRecord<>(this.topicPath, serializedKey, serializedValue);
     }
 
     private void maybeFlushAndMarkOffset() {
@@ -94,7 +131,8 @@ public class KafkaRecordEmitter implements Emitter {
     }
 
     private void flushAndMarkOffset() {
-        futures.entrySet().stream().filter(this::flush).filter(this::hasOffset).forEach(this::markOffset);
+        futures.entrySet().stream().filter(this::flush).filter(this::hasOffset)
+                .forEach(this::markOffset);
         offsetWriter.flush();
         futures.clear();
     }
@@ -103,7 +141,7 @@ public class KafkaRecordEmitter implements Emitter {
         try {
             recordEntry.getValue().get(); // wait
             if (++emitCount % 10_000 == 0) {
-                LOGGER.debug("Emitted {} records to Kafka Broker", emitCount);
+                LOGGER.error("Emitted {} records to Kafka Broker", emitCount);
                 emitCount = 0;
             }
             return true;
@@ -116,10 +154,12 @@ public class KafkaRecordEmitter implements Emitter {
 
     private boolean hasOffset(Map.Entry<Record, Future<RecordMetadata>> recordEntry) {
         Record record = recordEntry.getKey();
-        if (record.getSource().snapshot || commitLogTransfer.getClass().getName().equals(CassandraConnectorConfig.DEFAULT_COMMIT_LOG_TRANSFER_CLASS)) {
+        if (record.getSource().snapshot || commitLogTransfer.getClass().getName()
+                .equals(CassandraConnectorConfig.DEFAULT_COMMIT_LOG_TRANSFER_CLASS)) {
             return record.shouldMarkOffset();
         }
-        return record.shouldMarkOffset() && !erroneousCommitLogs.contains(record.getSource().offsetPosition.fileName);
+        return record.shouldMarkOffset() && !erroneousCommitLogs.contains(
+                record.getSource().offsetPosition.fileName);
     }
 
     private void markOffset(Map.Entry<Record, Future<RecordMetadata>> recordEntry) {

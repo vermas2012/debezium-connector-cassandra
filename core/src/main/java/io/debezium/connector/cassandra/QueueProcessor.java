@@ -45,7 +45,10 @@ public class QueueProcessor extends AbstractProcessor {
 
     @Override
     public void process() throws InterruptedException {
+        LOGGER.error("#### " + getName() + "'s process() will trigger processEvent");
         List<Event> events = queue.poll();
+
+        LOGGER.error("#### " + getName() + "'s process() will trigger processEvent with numEvents: " + events.size());
         for (Event event : events) {
             try {
                 processEvent(event);
@@ -58,6 +61,7 @@ public class QueueProcessor extends AbstractProcessor {
 
     @Override
     public void initialize() throws Exception {
+        LOGGER.error("#### Initializing the queue processor.");
         File dir = new File(commitLogRelocationDir);
         if (!dir.exists()) {
             if (!dir.mkdir()) {
@@ -84,12 +88,14 @@ public class QueueProcessor extends AbstractProcessor {
     }
 
     private void processEvent(Event event) {
+        LOGGER.error("#### " + getName() + "  processing events.");
         if (event == null) {
             return;
         }
         switch (event.getEventType()) {
             case CHANGE_EVENT:
                 ChangeRecord changeRecord = (ChangeRecord) event;
+                LOGGER.error("#### " + getName() + "  processing Change Record events.");
                 recordEmitter.emit(changeRecord);
                 break;
             case TOMBSTONE_EVENT:

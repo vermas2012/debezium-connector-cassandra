@@ -132,6 +132,7 @@ public class Cassandra4CommitLogProcessor extends AbstractProcessor {
                         // since executor service is single-threaded, it will block until the previous log is processed,
                         // basically achieving sequential log processing
                         if (path.getFileName().toString().endsWith("_cdc.idx")) {
+                            LOGGER.error("######## Found new file: " + path.getFileName().toString());
                             submit(path);
                         }
                     }

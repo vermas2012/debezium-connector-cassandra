@@ -157,12 +157,13 @@ public class CassandraConnectorTaskTemplate {
             processorGroup.addProcessor(new SnapshotProcessor(taskContext));
             List<ChangeEventQueue<Event>> queues = taskContext.getQueues();
             for (int i = 0; i < queues.size(); i++) {
+                LOGGER.error("##### Starting a queue processor for queue number " + i);
                 processorGroup.addProcessor(new QueueProcessor(taskContext, i, recordEmitter));
             }
             if (taskContext.getCassandraConnectorConfig().postProcessEnabled()) {
                 processorGroup.addProcessor(new CommitLogPostProcessor(taskContext.getCassandraConnectorConfig()));
             }
-            LOGGER.info("Initialized Processor Group.");
+            LOGGER.error("### Initialized Processor Group. with " + queues.size() + " queues.");
             return processorGroup;
         }
         catch (Exception e) {
