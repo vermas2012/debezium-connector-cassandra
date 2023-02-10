@@ -233,6 +233,7 @@ public class Cassandra3CommitLogReadHandlerImpl implements CommitLogReadHandler 
 
     @Override
     public void handleMutation(Mutation mutation, int size, int entryLocation, CommitLogDescriptor descriptor) {
+        LOGGER.error("Mutation in handler " + mutation.toString());
         if (!mutation.trackedByCDC()) {
             if (LOGGER.isDebugEnabled()) {
                 LOGGER.debug("not tracked by cdc {}.{{}}",

@@ -109,7 +109,7 @@ public class CommitLogIdxParser {
             return new CommitLogProcessingResult(commitLog, DOES_NOT_EXIST);
         }
 
-        LOGGER.info("Processing commit log {}", commitLog.log.toString());
+        LOGGER.error("Processing commit log {}", commitLog.log.toString());
         metrics.setCommitLogFilename(commitLog.log.toString());
         metrics.setCommitLogPosition(0);
 

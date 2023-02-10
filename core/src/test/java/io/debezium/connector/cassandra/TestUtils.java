@@ -34,10 +34,10 @@ public class TestUtils {
     public static final String TEST_SCHEMA_REGISTRY_URL = "http://localhost:8081";
     public static final String TEST_KAFKA_TOPIC_PREFIX = "test_topic";
 
-    public static final String TEST_KEYSPACE_NAME = "test_keyspace";
+    public static final String TEST_KEYSPACE_NAME = "default";
     public static final String TEST_KEYSPACE_NAME_2 = "test_keyspace2";
 
-    public static String TEST_TABLE_NAME = "table_" + UUID.randomUUID().toString().replace("-", "");
+    public static String TEST_TABLE_NAME = "cdc_table";
     public static String TEST_TABLE_NAME_2 = "table2_" + UUID.randomUUID().toString().replace("-", "");
 
     public static Properties generateDefaultConfigMap() throws IOException {

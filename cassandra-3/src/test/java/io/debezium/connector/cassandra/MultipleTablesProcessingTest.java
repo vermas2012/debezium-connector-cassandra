@@ -21,20 +21,31 @@ import static org.junit.Assert.assertEquals;
 
 import java.util.List;
 
+import org.apache.kafka.connect.json.JsonConverter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.testcontainers.shaded.com.google.common.collect.Maps;
+
 public class MultipleTablesProcessingTest extends AbstractCommitLogProcessorTest {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(MultipleTablesProcessingTest.class);
 
     @Override
     public void initialiseData() throws Exception {
-        createTable("CREATE TABLE IF NOT EXISTS %s.%s (a int, b int, c int, PRIMARY KEY ((a), b)) WITH cdc = true;",
+        createTable(
+                "CREATE TABLE IF NOT EXISTS %s.%s (a int, b int, c int, PRIMARY KEY ((a), b)) WITH cdc = true;",
                 TEST_KEYSPACE_NAME, TEST_TABLE_NAME);
-        createTable("CREATE TABLE IF NOT EXISTS %s.%s (a int, b int, c int, PRIMARY KEY ((a), b)) WITH cdc = true;",
+        createTable(
+                "CREATE TABLE IF NOT EXISTS %s.%s (a int, b int, c int, d double, PRIMARY KEY ((a), b)) WITH cdc = true;",
                 TEST_KEYSPACE_NAME, TEST_TABLE_NAME_2);
 
         createTestKeyspace(TEST_KEYSPACE_NAME_2);
 
-        createTable("CREATE TABLE IF NOT EXISTS %s.%s (a int, b int, c int, PRIMARY KEY ((a), b)) WITH cdc = true;",
+        createTable(
+                "CREATE TABLE IF NOT EXISTS %s.%s (a int, b int, c int, PRIMARY KEY ((a), b)) WITH cdc = true;",
                 TEST_KEYSPACE_NAME_2, TEST_TABLE_NAME);
-        createTable("CREATE TABLE IF NOT EXISTS %s.%s (a int, b int, c int, PRIMARY KEY ((a), b)) WITH cdc = true;",
+        createTable(
+                "CREATE TABLE IF NOT EXISTS %s.%s (a int, b int, c int, PRIMARY KEY ((a), b)) WITH cdc = true;",
                 TEST_KEYSPACE_NAME_2, TEST_TABLE_NAME_2);
 
         runCql(insertInto(TEST_KEYSPACE_NAME, TEST_TABLE_NAME)
@@ -61,16 +72,34 @@ public class MultipleTablesProcessingTest extends AbstractCommitLogProcessorTest
                 .value("c", literal(3))
                 .build());
 
-        runCql(deleteFrom(TEST_KEYSPACE_NAME, TEST_TABLE_NAME).whereColumn("a").isEqualTo(literal(1)).build());
-        runCql(deleteFrom(TEST_KEYSPACE_NAME, TEST_TABLE_NAME_2).whereColumn("a").isEqualTo(literal(1)).build());
+        runCql(deleteFrom(TEST_KEYSPACE_NAME, TEST_TABLE_NAME).whereColumn("a").isEqualTo(literal(1))
+                .build());
+        runCql(deleteFrom(TEST_KEYSPACE_NAME, TEST_TABLE_NAME_2).whereColumn("a").isEqualTo(literal(1))
+                .build());
 
-        runCql(deleteFrom(TEST_KEYSPACE_NAME_2, TEST_TABLE_NAME).whereColumn("a").isEqualTo(literal(1)).build());
-        runCql(deleteFrom(TEST_KEYSPACE_NAME_2, TEST_TABLE_NAME_2).whereColumn("a").isEqualTo(literal(1)).build());
+        runCql(deleteFrom(TEST_KEYSPACE_NAME_2, TEST_TABLE_NAME).whereColumn("a").isEqualTo(literal(1))
+                .build());
+        runCql(
+                deleteFrom(TEST_KEYSPACE_NAME_2, TEST_TABLE_NAME_2).whereColumn("a").isEqualTo(literal(1))
+                        .build());
+
+        runCql(insertInto(TEST_KEYSPACE_NAME, TEST_TABLE_NAME_2)
+                .value("a", literal(1))
+                .value("b", literal(2))
+                .value("d", literal(3.0))
+                .build());
+        runCql(
+                deleteFrom(TEST_KEYSPACE_NAME_2, TEST_TABLE_NAME_2).whereColumn("a").isEqualTo(literal(1)).whereColumn("b").isEqualTo(literal(2))
+                        .build());
+
     }
 
     @Override
     public void verifyEvents() throws Exception {
-        final List<Event> events = getEvents(8);
+        final List<Event> events = getEvents(10);
+
+        JsonConverter converter = new JsonConverter();
+        converter.configure(Maps.newHashMap(), false);
 
         Record insert1 = (Record) events.get(0);
         assertEquals(insert1.getEventType(), CHANGE_EVENT);
@@ -103,5 +132,9 @@ public class MultipleTablesProcessingTest extends AbstractCommitLogProcessorTest
         Record delete4 = (Record) events.get(7);
         assertEquals(delete4.getEventType(), CHANGE_EVENT);
         assertEquals(DELETE, delete4.getOp());
+        LOGGER.error(new String(converter.fromConnectData("test", delete4.getValueSchema(), delete4.buildValue())));
+
+        Record record = (Record) events.get(9);
+        LOGGER.error(new String(converter.fromConnectData("test", record.getValueSchema(), record.buildValue())));
     }
 }

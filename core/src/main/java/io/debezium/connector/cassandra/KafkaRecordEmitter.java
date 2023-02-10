@@ -15,9 +15,13 @@ import java.util.concurrent.Future;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
+import org.apache.kafka.connect.data.SchemaAndValue;
+import org.apache.kafka.connect.json.JsonConverter;
 import org.apache.kafka.connect.storage.Converter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.google.common.collect.Maps;
 
 import io.debezium.DebeziumException;
 import io.debezium.config.CommonConnectorConfig;
@@ -62,6 +66,14 @@ public class KafkaRecordEmitter implements Emitter {
         try {
             synchronized (lock) {
                 ProducerRecord<byte[], byte[]> producerRecord = toProducerRecord(record);
+
+                JsonConverter converter = new JsonConverter();
+                converter.configure(Maps.newHashMap());
+
+                SchemaAndValue schemaAndValue = converter.toConnectData("dummy", producerRecord.value());
+
+                LOGGER.error("#### Produded :" + schemaAndValue.toString());
+
                 Future<RecordMetadata> future = producer.send(producerRecord);
                 LOGGER.trace("Sent to topic {}: {}", producerRecord.topic(), record);
                 futures.put(record, future);
